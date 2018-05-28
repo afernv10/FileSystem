@@ -21,6 +21,11 @@ static struct file_system_type assoofs_type = {
 	.kill_sb = kill_litter_super,
 };
 
+/* Operaciones del superbloque */
+static const struct super_operations assoofs_sops = {
+	.drop_inode = generic_delete_inode,
+};
+
 static int __init assoofs_init(void){
 	int ret;
 	assoofs_inode_cache = kmem_cache_create("assoofs_inode_cache", sizeof(struct assoofs_inode_info), 0, (SLAB_RECLAIM_ACCOUNT| SLAB_MEM_SPREAD), NULL);
@@ -86,6 +91,53 @@ int assoofs_fill_super(struct super_block *sb, void *data, int silent){
 	sb->s_magic = ASSOOFS_MAGIC;
 
 	// seguir en casa mirando en el github de las referencias
+	sb->s_maxbytes = ASSOOFS_DEFAULT_BLOCK_SIZE;
+	sb->s_op = &assoofs_sops;
+	// guardar info bloque 0 en campo s_fs_info de sb??? donde está ese campo
+	sb->s_fs_info = assoofs_sb;	// así? donde está ese campo??
+
+
+	/* Creamos el inodo raíz */
+	root_inode = new_inode(sb);
+	// inicializar??
+	// asignamos propietario y permisos
+	inode_init_owner(root_inode, NULL, S_IFDIR);	//S_IFDIR para directorios, S_IFREG para ficheros
+	root_inode->i_ino = ASSOOFS_ROOTDIR_INODE_NUMBER;
+	root_inode->i_sb = sb;	// puntero al superbloque
+	root_inode->i_op = &assoofs_inode_ops;
+	root_inode->i_fop = &assoofs_file_operations;
+	root_inode->i_atime = root_inode->i_mtime = root_inode->i_ctime = current_time(root_inode);	// o CURRENT_TIME en duda
+	root_inode->i_private = assoofs_get_inode_info(sb, ASSOOFS_ROOTDIR_INODE_NUMBER);	// Información persistente del inodo
+
+	// ToDO Marcar el nuevo inodo como raiz y lo guardaremos en superbloque
+}
+
+struct assoofs_inode_info *assoofs_get_inode(struct super_block *sb, uint64_t inode_no){
+
+	// Acceder al disco para leer el bloque que contiene el almacen de inodos
+	struct assoofs_inode_info *inode_info = NULL;
+	struct buffer_head *bh;
+
+	bh = sb_bread(sb, ASSOOFS_INODESTORE_BLOCK_NUMBER);
+	inode_info = (struct assoofs_inode_info *)bh->b_data;
+
+	// recorrer el almacen de inodos en busca del inode_no
+	struct assoofs_super_block_info *afs_sb = sb->s_fs_info;
+	struct assoofs_inode:info *buffer = NULL;
+
+	int i;
+	for(i = 0; i < afs_sb->inodes_count; i++){
+		if(inode_info->inode_no == inode_no){
+			buffer = kmalloc(sizeof(struct assoofs_inode_info), GFP_KERNEL);
+			memcpy(buffer, inode_info, sizeof(*buffer));
+			break;
+		}
+		inode_info++;
+	}
+
+	// liberar recursos y devolver la info del inodo inode_no si estaba en el almacen
+	brelse(bh);
+	return buffer;
 }
 
 module_init(assoofs_init);
