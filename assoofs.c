@@ -9,6 +9,11 @@
 
 static struct kmem_cache *assoofs_inode_cache;
 
+static struct dentry *assoofs_mount(struct file_system_type *fs_type, int flags, const char *dev_name, void *data);
+extern struct dentry * d_make_root(struct inode *);
+static inline void d_add(struct dentry *entry, struct inode *inode);
+struct dentry *assoofs_lookup(struct inode *parent_inode, struct dentry *child_dentry, unsigned int flags);
+
 ssize_t assoofs_read(struct file * filp, char __user * buf, size_t len, loff_t * ppos);
 ssize_t assoofs_write(struct file * filp, const char __user * buf, size_t len, loff_t * ppos);
 //static int assoofs_iterate(struct file *filp, struct dir_context, )	// inacabado
@@ -94,12 +99,11 @@ int assoofs_fill_super(struct super_block *sb, void *data, int silent){
 	sb->s_maxbytes = ASSOOFS_DEFAULT_BLOCK_SIZE;
 	sb->s_op = &assoofs_sops;
 	// guardar info bloque 0 en campo s_fs_info de sb??? donde está ese campo
-	sb->s_fs_info = assoofs_sb;	// así? donde está ese campo??
+	sb->s_fs_info = assoofs_sb;	// el campo ese aunque no lo veamos está en el padding
 
 
 	/* Creamos el inodo raíz */
 	root_inode = new_inode(sb);
-	// inicializar??
 	// asignamos propietario y permisos
 	inode_init_owner(root_inode, NULL, S_IFDIR);	//S_IFDIR para directorios, S_IFREG para ficheros
 	root_inode->i_ino = ASSOOFS_ROOTDIR_INODE_NUMBER;
@@ -110,6 +114,12 @@ int assoofs_fill_super(struct super_block *sb, void *data, int silent){
 	root_inode->i_private = assoofs_get_inode_info(sb, ASSOOFS_ROOTDIR_INODE_NUMBER);	// Información persistente del inodo
 
 	// ToDO Marcar el nuevo inodo como raiz y lo guardaremos en superbloque
+	sb->s_root = d_make_root(root_inode);
+
+	if(!sb->s_root){
+		d_add(dentry, inode);
+	}
+
 }
 
 struct assoofs_inode_info *assoofs_get_inode(struct super_block *sb, uint64_t inode_no){
@@ -139,6 +149,53 @@ struct assoofs_inode_info *assoofs_get_inode(struct super_block *sb, uint64_t in
 	brelse(bh);
 	return buffer;
 }
+
+// 2.3.3.4 declarar structs de 2.3.4. y 2.3.5.
+// Declarar structs para manejar operaciones de inodos
+static struct inode_operations assoofs_inode_ops = {
+	.lookup = assoofs_lookup,
+	.create = assoofs_create,
+	.mkdir = assoofs_mkdir,
+};
+
+// Para manejar directorios
+const struct dir_operations assoofs_dir_operations = {
+	.owner = THIS_MODULE,
+	.iterate = assoofs_iterate,
+};
+
+// Para manejar ficheros
+const struct file_operations assoofs_file_operations = {
+	.read = assoofs_read;
+	.write = assoofs_write;
+};
+
+// 2.3.4
+struct dentry *assoofs_lookup(struct inode *parent_inode, struct dentry *child_dentry, unsigned int flags){
+
+	struct assoofs_inode_info *parent_info = parent_inode->i_private;
+	struct super_block *sb = parent_inode->i_sb;
+	struct buffer_head *bh;
+
+	bh = sb_bread(sb, parent_info->data_block_number);
+
+	struct assoofs_inode_info *parent_info = parent_inode->i_private;
+	int i;
+	for (i = 0; i < parent_info->dir_children_count; i++) {
+
+		if (!strcmp(record->filename, child_dentry->d_name.name)) {
+
+			struct inode *inode = assoofs_get_inode(sb, record->inode_no);
+			inode_init_owner(inode, parent_inode, ((struct assoofs_inode_info *)inode->i_private)->mode);
+			d_add(child_dentry, inode);
+			return NULL;
+		}
+		record++;
+	}
+
+}
+
+
 
 module_init(assoofs_init);
 module_exit(assoofs_exit);
