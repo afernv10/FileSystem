@@ -220,7 +220,7 @@ static struct inode *assoofs_get_inode(struct super_block *sb, int ino){
 return inode;
 }
 
-// assoofs_create
+// assoofs_create funcion
 
 
 
