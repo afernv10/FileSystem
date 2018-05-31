@@ -122,7 +122,7 @@ int assoofs_fill_super(struct super_block *sb, void *data, int silent){
 
 }
 
-struct assoofs_inode_info *assoofs_get_inode(struct super_block *sb, uint64_t inode_no){
+struct assoofs_inode_info *assoofs_get_inode_info(struct super_block *sb, uint64_t inode_no){
 
 	// Acceder al disco para leer el bloque que contiene el almacen de inodos
 	struct assoofs_inode_info *inode_info = NULL;
@@ -193,6 +193,10 @@ struct dentry *assoofs_lookup(struct inode *parent_inode, struct dentry *child_d
 		record++;
 	}
 
+}
+
+static struct inode *assoofs_get_inode(struct super_block *sb, int ino){
+	// implementar
 }
 
 
