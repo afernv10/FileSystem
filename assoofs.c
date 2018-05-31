@@ -197,7 +197,30 @@ struct dentry *assoofs_lookup(struct inode *parent_inode, struct dentry *child_d
 
 static struct inode *assoofs_get_inode(struct super_block *sb, int ino){
 	// implementar
+	struct inode *inode;
+
+	inode_info = assoofs_get_inode_info(sb, ino);
+
+	
+
+	if (S_ISDIR(inode_info->mode))
+		inode->i_fop = &assoofs_dir_operations;
+	else if (S_ISREG(inode_info->mode))
+		inode->i_fop = &assoofs_file_operations;
+	else
+		printk(KERN_ERR
+					 "Unknown inode type. Neither a directory nor a file");
+
+	/* FIXME: We should store these times to disk and retrieve them */
+	inode->i_atime = inode->i_mtime = inode->i_ctime =
+			current_time(inode);
+
+	inode->i_private = inode_info;
+
+return inode;
 }
+
+// assoofs_create
 
 
 
